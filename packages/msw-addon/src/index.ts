@@ -1,1 +1,1 @@
-export * from './mswDecorator';
+export * from "./mswLoader";

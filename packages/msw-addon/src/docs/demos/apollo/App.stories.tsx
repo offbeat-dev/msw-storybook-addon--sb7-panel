@@ -1,23 +1,28 @@
 import React from "react";
+import type { Meta, StoryObj } from "@storybook/react";
 import { ApolloClient, ApolloProvider, InMemoryCache } from "@apollo/client";
 import { graphql } from "msw";
 import { App } from "./App";
 
-export default {
+const meta: Meta<typeof App> = {
   title: "Demos/Apollo",
-  component: App,
+  tags: ["autodocs"],
 };
+export default meta;
+type Story = StoryObj<typeof App>;
 
 const defaultClient = new ApolloClient({
   uri: "https://swapi-graphql.netlify.app/.netlify/functions/index",
   cache: new InMemoryCache(),
 });
 
-export const DefaultBehavior = () => (
-  <ApolloProvider client={defaultClient}>
-    <App />
-  </ApolloProvider>
-);
+export const DefaultBehavior: Story = {
+  render: () => (
+    <ApolloProvider client={defaultClient}>
+      <App />
+    </ApolloProvider>
+  ),
+};
 
 const mockedClient = new ApolloClient({
   uri: "https://swapi-graphql.netlify.app/.netlify/functions/index",
@@ -33,12 +38,6 @@ const mockedClient = new ApolloClient({
     },
   },
 });
-
-const MockTemplate = () => (
-  <ApolloProvider client={mockedClient}>
-    <App />
-  </ApolloProvider>
-);
 
 const films = [
   {
@@ -58,37 +57,49 @@ const films = [
   },
 ];
 
-export const MockedSuccess = MockTemplate.bind({});
-MockedSuccess.parameters = {
-  msw: {
-    handlers: [
-      graphql.query("AllFilmsQuery", (req, res, ctx) => {
-        return res(
-          ctx.data({
-            allFilms: {
-              films,
-            },
-          })
-        );
-      }),
-    ],
+export const MockedSuccess: Story = {
+  render: () => (
+    <ApolloProvider client={mockedClient}>
+      <App />
+    </ApolloProvider>
+  ),
+  parameters: {
+    msw: {
+      handlers: [
+        graphql.query("AllFilmsQuery", (req, res, ctx) => {
+          return res(
+            ctx.data({
+              allFilms: {
+                films,
+              },
+            })
+          );
+        }),
+      ],
+    },
   },
 };
 
-export const MockedError = MockTemplate.bind({});
-MockedError.parameters = {
-  msw: {
-    handlers: [
-      graphql.query("AllFilmsQuery", (req, res, ctx) => {
-        return res(
-          ctx.delay(800),
-          ctx.errors([
-            {
-              message: "Access denied",
-            },
-          ])
-        );
-      }),
-    ],
+export const MockedError: Story = {
+  render: () => (
+    <ApolloProvider client={mockedClient}>
+      <App />
+    </ApolloProvider>
+  ),
+  parameters: {
+    msw: {
+      handlers: [
+        graphql.query("AllFilmsQuery", (req, res, ctx) => {
+          return res(
+            ctx.delay(800),
+            ctx.errors([
+              {
+                message: "Access denied",
+              },
+            ])
+          );
+        }),
+      ],
+    },
   },
 };
