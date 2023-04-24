@@ -1,29 +1,27 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useQuery, gql } from "@apollo/client";
 import FilmCard, { FilmProps } from "../../components/FilmCard";
 
-const AllFilmsQuery = gql`
-  query AllFilmsQuery {
-    allFilms {
-      films {
-        title
-        episode_id: episodeID
-        opening_crawl: openingCrawl
-      }
-    }
-  }
+const AllFilmsQuery = (query: string) => gql`
+  ${query}
 `;
 
-function useFetchFilms() {
-  const { loading, error, data } = useQuery(AllFilmsQuery);
+function useFetchFilms(query: string) {
+  const { loading, error, data } = useQuery(AllFilmsQuery(query));
 
   const films = data ? data.allFilms.films : [];
 
   return { loading, error, films };
 }
 
-export const App = () => {
-  const { loading, error, films } = useFetchFilms();
+export const App = ({
+  query,
+  queryName,
+}: {
+  queryName: string;
+  query: string;
+}) => {
+  const { loading, error, films } = useFetchFilms(query);
 
   if (loading) {
     return <p>Fetching Star Wars data...</p>;

@@ -24,7 +24,6 @@ const films = [
 const meta: Meta<typeof App> = {
   title: "Demos/Axios",
   component: App,
-  tags: ["autodocs"],
 };
 
 export default meta;

@@ -25,7 +25,6 @@ const films = [
 const meta: Meta<typeof App> = {
   title: "Demos/Fetch",
   component: App,
-  tags: ["autodocs"],
 };
 
 export default meta;

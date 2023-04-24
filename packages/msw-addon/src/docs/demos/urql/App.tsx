@@ -3,21 +3,13 @@ import { useQuery } from "urql";
 
 import FilmCard, { FilmProps } from "../../components/FilmCard";
 
-const AllFilmsQuery = `
-  query AllFilmsQuery {
-    allFilms {
-      films {
-        title
-        episode_id: episodeID
-        opening_crawl: openingCrawl
-      }
-    }
-  }
+const AllFilmsQuery = (query: string) => `
+  ${query}
 `;
 
-function useFetchFilms() {
+function useFetchFilms(query: string) {
   const [{ fetching, error, data }] = useQuery({
-    query: AllFilmsQuery,
+    query: AllFilmsQuery(query),
   });
 
   const loading = fetching;
@@ -26,8 +18,14 @@ function useFetchFilms() {
   return { loading, error, films };
 }
 
-export function App() {
-  const { loading, error, films } = useFetchFilms();
+export const App = ({
+  query,
+  queryName,
+}: {
+  queryName: string;
+  query: string;
+}) => {
+  const { loading, error, films } = useFetchFilms(query);
 
   if (loading) {
     return <p>Fetching Star Wars data...</p>;
@@ -44,4 +42,4 @@ export function App() {
       ))}
     </div>
   );
-}
+};

@@ -4,28 +4,53 @@ import { ApolloClient, ApolloProvider, InMemoryCache } from "@apollo/client";
 import { graphql } from "msw";
 import { App } from "./App";
 
+const queryName = "AllFilmsQuery";
+const query = `query ${queryName} {
+        allFilms {
+          films {
+            title
+            episode_id: episodeID
+            opening_crawl: openingCrawl
+          }
+        }
+      }`;
+const clientUri = "https://swapi-graphql.netlify.app/.netlify/functions/index";
+
 const meta: Meta<typeof App> = {
   title: "Demos/Apollo",
-  tags: ["autodocs"],
 };
 export default meta;
 type Story = StoryObj<typeof App>;
 
 const defaultClient = new ApolloClient({
-  uri: "https://swapi-graphql.netlify.app/.netlify/functions/index",
+  uri: clientUri,
   cache: new InMemoryCache(),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: "no-cache",
+      errorPolicy: "all",
+    },
+    query: {
+      fetchPolicy: "no-cache",
+      errorPolicy: "all",
+    },
+  },
 });
 
 export const DefaultBehavior: Story = {
-  render: () => (
+  args: {
+    queryName,
+    query,
+  },
+  render: (args) => (
     <ApolloProvider client={defaultClient}>
-      <App />
+      <App {...args} />
     </ApolloProvider>
   ),
 };
 
 const mockedClient = new ApolloClient({
-  uri: "https://swapi-graphql.netlify.app/.netlify/functions/index",
+  uri: clientUri,
   cache: new InMemoryCache(),
   defaultOptions: {
     watchQuery: {
@@ -58,15 +83,19 @@ const films = [
 ];
 
 export const MockedSuccess: Story = {
-  render: () => (
+  args: {
+    ...DefaultBehavior.args,
+  },
+  render: (args) => (
     <ApolloProvider client={mockedClient}>
-      <App />
+      <App {...args} />
     </ApolloProvider>
   ),
   parameters: {
     msw: {
+      clientUri,
       handlers: [
-        graphql.query("AllFilmsQuery", (req, res, ctx) => {
+        graphql.query(queryName, (req, res, ctx) => {
           return res(
             ctx.data({
               allFilms: {
@@ -81,15 +110,19 @@ export const MockedSuccess: Story = {
 };
 
 export const MockedError: Story = {
-  render: () => (
+  args: {
+    ...DefaultBehavior.args,
+  },
+  render: (args) => (
     <ApolloProvider client={mockedClient}>
-      <App />
+      <App {...args} />
     </ApolloProvider>
   ),
   parameters: {
     msw: {
+      clientUri,
       handlers: [
-        graphql.query("AllFilmsQuery", (req, res, ctx) => {
+        graphql.query(queryName, (req, res, ctx) => {
           return res(
             ctx.delay(800),
             ctx.errors([

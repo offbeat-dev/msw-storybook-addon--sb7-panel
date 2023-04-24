@@ -10,7 +10,6 @@ const endpoint = "https://swapi.dev/api/films/";
 const meta: Meta<typeof App> = {
   title: "Demos/React Router + RQ",
   component: App,
-  tags: ["autodocs"],
 };
 export default meta;
 type Story = StoryObj<typeof App>;

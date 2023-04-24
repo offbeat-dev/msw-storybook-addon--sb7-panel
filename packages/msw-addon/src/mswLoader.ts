@@ -1,4 +1,12 @@
-import { SetupWorker, RequestHandler, setupWorker } from "msw";
+import {
+  SetupWorker,
+  RequestHandler,
+  setupWorker,
+  graphql,
+  GraphQLHandler,
+  GraphQLRequest,
+  GraphQLVariables,
+} from "msw";
 
 export type SetupApi = SetupWorker;
 export type InitializeOptions = Parameters<SetupWorker["start"]>[0];
@@ -7,6 +15,7 @@ export type MswParameters = {
   msw?: {
     handlers: any[];
     originalResponses: Record<string, any>;
+    graphQLClientUri?: string;
   };
 };
 
@@ -71,7 +80,8 @@ export const mswLoader = async (context: Context) => {
     if (!(window as any).msw) worker.start(opt || {});
 
     (window as any).msw = worker;
-    const responses = await getOriginalResponses(handlers);
+    const responses = await getOriginalResponses(handlers, context);
+
     context.parameters.msw = {
       ...msw,
       originalResponses: responses,
@@ -82,46 +92,116 @@ export const mswLoader = async (context: Context) => {
 };
 
 const modifyHandlersAndArgs = (handlers: any, context: Context) => {
+  const newHandlers: GraphQLHandler<GraphQLRequest<GraphQLVariables>>[] = [];
   handlers.forEach((handler: any) => {
-    const modifiedPath =
-      handler.info.path.replace(/\/$/, "") + `/${self.crypto.randomUUID()}`;
-    Object.keys(context.args).forEach((key) => {
-      if (context.args[key] === handler.info.path) {
-        context.args[key] = modifiedPath;
-      }
-    });
-    Object.keys(context.allArgs).forEach((key) => {
-      if (context.allArgs[key] === handler.info.path) {
-        context.allArgs[key] = modifiedPath;
-      }
-    });
-    Object.keys(context.initialArgs).forEach((key) => {
-      if (context.initialArgs[key] === handler.info.path) {
-        context.initialArgs[key] = modifiedPath;
-      }
-    });
-    handler.info.header = handler.info.header.replace(
-      handler.info.path,
-      modifiedPath
-    );
-    handler.info.path = modifiedPath;
+    if (!!handler.info.method) {
+      const modifiedPath =
+        handler.info.path.replace(/\/$/, "") + `/${self.crypto.randomUUID()}`;
+      Object.keys(context.args).forEach((key) => {
+        if (context.args[key] === handler.info.path) {
+          context.args[key] = modifiedPath;
+        }
+      });
+      Object.keys(context.allArgs).forEach((key) => {
+        if (context.allArgs[key] === handler.info.path) {
+          context.allArgs[key] = modifiedPath;
+        }
+      });
+      Object.keys(context.initialArgs).forEach((key) => {
+        if (context.initialArgs[key] === handler.info.path) {
+          context.initialArgs[key] = modifiedPath;
+        }
+      });
+      handler.info.header = handler.info.header.replace(
+        handler.info.path,
+        modifiedPath
+      );
+      handler.info.path = modifiedPath;
+    } else {
+      const queryUniqueIdentifier = self.crypto.randomUUID().split("-")[0];
+      const modifiedOperationName =
+        handler.info.operationName.replace(/\/$/, "") +
+        `${
+          queryUniqueIdentifier.charAt(0).toUpperCase() +
+          queryUniqueIdentifier.slice(1).toLowerCase()
+        }`;
+      // // handler.endpoint = modifiedEndpoint;
+      Object.keys(context.args).forEach((key) => {
+        if (context.args[key].includes(handler.info.operationName)) {
+          context.args[key] = context.args[key].replace(
+            handler.info.operationName,
+            modifiedOperationName
+          );
+        }
+      });
+      Object.keys(context.allArgs).forEach((key) => {
+        if (context.allArgs[key].includes(handler.info.operationName)) {
+          context.allArgs[key] = context.allArgs[key].replace(
+            handler.info.operationName,
+            modifiedOperationName
+          );
+        }
+      });
+      Object.keys(context.initialArgs).forEach((key) => {
+        if (context.initialArgs[key].includes(handler.info.operationName)) {
+          context.initialArgs[key] = context.initialArgs[key].replace(
+            handler.info.operationName,
+            modifiedOperationName
+          );
+        }
+      });
+      const modifiedHeader = handler.info.header.replace(
+        handler.info.operationName,
+        modifiedOperationName
+      );
+      // modifiedHeader.replace("*", `/${handler.endpoint}`);
+      handler.info.header = modifiedHeader;
+      handler.info.operationName = handler.info.operationName.replace(
+        handler.info.operationName,
+        modifiedOperationName
+      );
+      newHandlers.push(graphql.query(modifiedOperationName, handler.resolver));
+    }
   });
 
-  return { handlers: handlers, context: context };
+  return { handlers: newHandlers, context: context };
 };
 
-const getOriginalResponses = async (handlers: any[]) => {
+const getOriginalResponses = async (handlers: any[], context: Context) => {
   const originalResponses = {} as Record<string, any>;
   for (const handler of handlers) {
-    const originalRequest = new Request(handler.info.path);
-    const originalResponse = await fetch(originalRequest);
-    let originalData;
-    if (!originalResponse.ok) originalData = null;
-    else originalData = await originalResponse.json();
-    originalResponses[handler.info.path] = {
-      data: originalData,
-      status: originalResponse.status,
-    };
+    if (!!handler.info.method) {
+      const originalRequest = new Request(handler.info.path);
+      const originalResponse = await fetch(originalRequest);
+      let originalData;
+      if (!originalResponse.ok) originalData = null;
+      else originalData = await originalResponse.json();
+      originalResponses[handler.info.path] = {
+        data: originalData,
+        status: originalResponse.status,
+      };
+    } else if (!!handler.info.operationName) {
+      const originalResponse = await fetch(
+        context.parameters.msw.graphQLClientUri,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            query: context.args.query,
+            variables: {},
+          }),
+        }
+      );
+      let originalData;
+      if (!originalResponse.ok) originalData = null;
+      else originalData = await originalResponse.json();
+      originalResponses[handler.info.operationName] = {
+        ...originalData,
+        status: originalResponse.status,
+      };
+    }
   }
 
   return originalResponses;

@@ -10,7 +10,7 @@ import {
   STORY_ARGS_UPDATED,
 } from "@storybook/core-events";
 import { EVENTS, PARAM_KEY } from "./constants";
-import { RequestHandler, rest } from "msw";
+import { RequestHandler, graphql, rest } from "msw";
 
 type Context = {
   [x: string]: any;
@@ -39,24 +39,35 @@ const getParameter = (
 };
 
 const updateHandlers = (handlers: RequestHandler[]) => {
-  console.log(handlers);
-  if (!handlers || !responses) return;
-  return;
-
+  if (!handlers || !responses || !Array.isArray(handlers)) return;
   const worker = (window as any).msw;
   handlers?.forEach((handler: any) => {
-    if (!responses[handler.info.path]) return;
-    const currentResponse = responses[handler.info.path];
-    status = currentResponse.status;
-    worker.use(
-      rest.get(handler.info.path, (req, res, ctx) => {
-        return res(
-          ctx.status(currentResponse.status),
-          ctx.delay(delay),
-          ctx.json(currentResponse.data)
-        );
-      })
-    );
+    if (responses[handler.info.path]) {
+      const currentResponse = responses[handler.info.path];
+      status = currentResponse.status;
+      worker.use(
+        rest.get(handler.info.path, (req, res, ctx) => {
+          return res(
+            ctx.status(currentResponse.status),
+            ctx.delay(delay),
+            ctx.json(currentResponse.data)
+          );
+        })
+      );
+    } else if (handler.info.operationName) {
+      const currentResponse = responses[handler.info.operationName];
+      status = currentResponse.status;
+      console.log(currentResponse);
+      worker.use(
+        graphql.query(handler.info.operationName, (req, res, ctx) => {
+          return res(
+            ctx.status(currentResponse.status),
+            ctx.delay(delay),
+            ctx.data(currentResponse.data)
+          );
+        })
+      );
+    }
   });
 };
 
@@ -69,7 +80,6 @@ export const withRoundTrip = (
     handlers: any;
 
   const worker = (window as any).msw;
-
   parameters = ctx.parameters;
   if (parameters) msw = getParameter(parameters, PARAM_KEY, []);
 

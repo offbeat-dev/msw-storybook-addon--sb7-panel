@@ -4,37 +4,44 @@ import { createClient, Provider } from "urql";
 import { graphql } from "msw";
 import { App } from "./App";
 
+const queryName = "AllFilmsQuery";
+const query = `query ${queryName} {
+  allFilms {
+    films {
+      title
+      episode_id: episodeID
+      opening_crawl: openingCrawl
+    }
+  }
+}`;
+const clientUri = "https://swapi-graphql.netlify.app/.netlify/functions/index";
+
 const meta: Meta<typeof App> = {
   title: "Demos/Urlq",
-  tags: ["autodocs"],
 };
 export default meta;
 type Story = StoryObj<typeof App>;
 
 const defaultClient = createClient({
-  url: "https://swapi-graphql.netlify.app/.netlify/functions/index",
+  url: clientUri,
 });
 
 export const DefaultBehavior: Story = {
-  render: () => (
+  args: {
+    queryName,
+    query,
+  },
+  render: (args) => (
     <Provider value={defaultClient}>
-      <App />
+      <App {...args} />
     </Provider>
   ),
 };
 
 const mockedClient = createClient({
-  url: "https://swapi-graphql.netlify.app/.netlify/functions/index",
+  url: clientUri,
   requestPolicy: "network-only",
 });
-
-const MockTemplate: Story = {
-  render: () => (
-    <Provider value={mockedClient}>
-      <App />
-    </Provider>
-  ),
-};
 
 const films = [
   {
@@ -55,11 +62,19 @@ const films = [
 ];
 
 export const MockedSuccess: Story = {
-  ...MockTemplate,
+  args: {
+    ...DefaultBehavior.args,
+  },
+  render: (args) => (
+    <Provider value={mockedClient}>
+      <App {...args} />
+    </Provider>
+  ),
   parameters: {
     msw: {
+      clientUri,
       handlers: [
-        graphql.query("AllFilmsQuery", (req, res, ctx) => {
+        graphql.query(queryName, (req, res, ctx) => {
           return res(
             ctx.data({
               allFilms: {
@@ -74,11 +89,19 @@ export const MockedSuccess: Story = {
 };
 
 export const MockedError: Story = {
-  ...MockTemplate,
+  args: {
+    ...DefaultBehavior.args,
+  },
+  render: (args) => (
+    <Provider value={mockedClient}>
+      <App {...args} />
+    </Provider>
+  ),
   parameters: {
     msw: {
+      clientUri,
       handlers: [
-        graphql.query("AllFilmsQuery", (req, res, ctx) => {
+        graphql.query(queryName, (req, res, ctx) => {
           return res(
             ctx.delay(800),
             ctx.errors([
