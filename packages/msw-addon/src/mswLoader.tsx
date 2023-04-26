@@ -20,6 +20,7 @@ export type MswParameters = {
 };
 
 type Context = {
+  id: any;
   parameters: MswParameters;
   viewMode: string;
   args: Record<string, any>;
@@ -53,6 +54,8 @@ export const mswLoader = async (context: Context) => {
   if (msw.originalResponses || ((window as any).msw && viewMode !== "docs"))
     return;
 
+  console.log(context, msw);
+
   let worker;
   if (viewMode === "docs" && (window as any).msw) {
     worker = typeof global.process === "undefined" && (window as any).msw;
@@ -67,12 +70,12 @@ export const mswLoader = async (context: Context) => {
         (handlers, handlersList) => handlers.concat(handlersList),
         [] as RequestHandler[]
       );
-    if (viewMode === "docs") {
-      const { handlers: modifiedHandlers, context: modifiedContext } =
-        modifyHandlersAndArgs(handlers, context);
-      handlers = modifiedHandlers;
-      context = modifiedContext;
-    }
+    // if (viewMode === "docs") {
+    //   const { handlers: modifiedHandlers, context: modifiedContext } =
+    //     modifyHandlersAndArgs(handlers, context);
+    //   handlers = modifiedHandlers;
+    //   context = modifiedContext;
+    // }
 
     if (handlers.length > 0) {
       worker.use(...handlers);
@@ -97,6 +100,7 @@ const modifyHandlersAndArgs = (handlers: any, context: Context) => {
     if (!!handler.info.method) {
       const modifiedPath =
         handler.info.path.replace(/\/$/, "") + `/${self.crypto.randomUUID()}`;
+
       Object.keys(context.args).forEach((key) => {
         if (context.args[key] === handler.info.path) {
           context.args[key] = modifiedPath;
@@ -117,50 +121,7 @@ const modifyHandlersAndArgs = (handlers: any, context: Context) => {
         modifiedPath
       );
       handler.info.path = modifiedPath;
-    } else {
-      const queryUniqueIdentifier = self.crypto.randomUUID().split("-")[0];
-      const modifiedOperationName =
-        handler.info.operationName.replace(/\/$/, "") +
-        `${
-          queryUniqueIdentifier.charAt(0).toUpperCase() +
-          queryUniqueIdentifier.slice(1).toLowerCase()
-        }`;
-      // // handler.endpoint = modifiedEndpoint;
-      Object.keys(context.args).forEach((key) => {
-        if (context.args[key].includes(handler.info.operationName)) {
-          context.args[key] = context.args[key].replace(
-            handler.info.operationName,
-            modifiedOperationName
-          );
-        }
-      });
-      Object.keys(context.allArgs).forEach((key) => {
-        if (context.allArgs[key].includes(handler.info.operationName)) {
-          context.allArgs[key] = context.allArgs[key].replace(
-            handler.info.operationName,
-            modifiedOperationName
-          );
-        }
-      });
-      Object.keys(context.initialArgs).forEach((key) => {
-        if (context.initialArgs[key].includes(handler.info.operationName)) {
-          context.initialArgs[key] = context.initialArgs[key].replace(
-            handler.info.operationName,
-            modifiedOperationName
-          );
-        }
-      });
-      const modifiedHeader = handler.info.header.replace(
-        handler.info.operationName,
-        modifiedOperationName
-      );
-      // modifiedHeader.replace("*", `/${handler.endpoint}`);
-      handler.info.header = modifiedHeader;
-      handler.info.operationName = handler.info.operationName.replace(
-        handler.info.operationName,
-        modifiedOperationName
-      );
-      newHandlers.push(graphql.query(modifiedOperationName, handler.resolver));
+      newHandlers.push(handler);
     }
   });
 
@@ -180,28 +141,29 @@ const getOriginalResponses = async (handlers: any[], context: Context) => {
         data: originalData,
         status: originalResponse.status,
       };
-    } else if (!!handler.info.operationName) {
-      const originalResponse = await fetch(
-        context.parameters.msw.graphQLClientUri,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            query: context.args.query,
-            variables: {},
-          }),
-        }
-      );
-      let originalData;
-      if (!originalResponse.ok) originalData = null;
-      else originalData = await originalResponse.json();
-      originalResponses[handler.info.operationName] = {
-        ...originalData,
-        status: originalResponse.status,
-      };
     }
+    // else if (!!handler.info.operationName) {
+    //   const originalResponse = await fetch(
+    //     context.parameters.msw.graphQLClientUri,
+    //     {
+    //       method: "POST",
+    //       headers: {
+    //         "Content-Type": "application/json",
+    //       },
+    //       body: JSON.stringify({
+    //         query: context.args.query,
+    //         variables: {},
+    //       }),
+    //     }
+    //   );
+    //   let originalData;
+    //   if (!originalResponse.ok) originalData = null;
+    //   else originalData = await originalResponse.json();
+    //   originalResponses[handler.info.operationName] = {
+    //     ...originalData,
+    //     status: originalResponse.status,
+    //   };
+    // }
   }
 
   return originalResponses;

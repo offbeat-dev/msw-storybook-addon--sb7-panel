@@ -41,6 +41,7 @@ const getParameter = (
 const updateHandlers = (handlers: RequestHandler[]) => {
   if (!handlers || !responses || !Array.isArray(handlers)) return;
   const worker = (window as any).msw;
+  return;
   handlers?.forEach((handler: any) => {
     if (responses[handler.info.path]) {
       const currentResponse = responses[handler.info.path];
@@ -54,20 +55,21 @@ const updateHandlers = (handlers: RequestHandler[]) => {
           );
         })
       );
-    } else if (handler.info.operationName) {
-      const currentResponse = responses[handler.info.operationName];
-      status = currentResponse.status;
-      console.log(currentResponse);
-      worker.use(
-        graphql.query(handler.info.operationName, (req, res, ctx) => {
-          return res(
-            ctx.status(currentResponse.status),
-            ctx.delay(delay),
-            ctx.data(currentResponse.data)
-          );
-        })
-      );
     }
+    // else if (handler.info.operationName) {
+    //   const currentResponse = responses[handler.info.operationName];
+    //   status = currentResponse.status;
+    //   console.log(currentResponse);
+    //   worker.use(
+    //     graphql.query(handler.info.operationName, (req, res, ctx) => {
+    //       return res(
+    //         ctx.status(currentResponse.status),
+    //         ctx.delay(delay),
+    //         ctx.data(currentResponse.data)
+    //       );
+    //     })
+    //   );
+    // }
   });
 };
 

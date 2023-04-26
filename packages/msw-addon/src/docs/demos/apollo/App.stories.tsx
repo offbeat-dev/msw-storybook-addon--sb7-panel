@@ -3,66 +3,70 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { ApolloClient, ApolloProvider, InMemoryCache } from "@apollo/client";
 import { graphql } from "msw";
 import { App } from "./App";
+import { useParameter, useStoryContext } from "@storybook/preview-api";
 
-const queryName = "AllFilmsQuery";
-const query = `query ${queryName} {
-        allFilms {
-          films {
-            title
-            episode_id: episodeID
-            opening_crawl: openingCrawl
-          }
-        }
-      }`;
-const clientUri = "https://swapi-graphql.netlify.app/.netlify/functions/index";
+const operationName = "AllFilmsQuery";
+const graphQLClientUri =
+  "https://swapi-graphql.netlify.app/.netlify/functions/index";
+const mockedClient = new ApolloClient({
+  uri: graphQLClientUri,
+  cache: new InMemoryCache(),
+  defaultOptions: {
+    watchQuery: {
+      fetchPolicy: "no-cache",
+      errorPolicy: "all",
+    },
+    query: {
+      fetchPolicy: "no-cache",
+      errorPolicy: "all",
+    },
+  },
+});
 
 const meta: Meta<typeof App> = {
   title: "Demos/Apollo",
+  tags: ["autodocs"],
+  component: App,
+  parameters: {
+    msw: {
+      MockProvider: ApolloProvider,
+    },
+  },
+  decorators: [
+    (Story) => {
+      const context = useStoryContext();
+      let { MockProvider } = useParameter("msw", {} as any);
+      if (context.viewMode === "docs") {
+        const m = context.id.replace(/-/g, "");
+        context.args.operationName = `${operationName}${m}`;
+        MockProvider = ApolloProvider;
+        const handlers = context.parameters?.msw?.handlers;
+        if (handlers) {
+          handlers.forEach((handler: { info: { operationName: string } }) => {
+            if (handler.info.operationName) {
+              handler.info.operationName = handler.info.operationName + m;
+            }
+          });
+          context.parameters.msw.handlers = handlers;
+        }
+      }
+
+      return (
+        <MockProvider client={mockedClient}>
+          <Story />
+        </MockProvider>
+      );
+    },
+  ],
 };
 export default meta;
 type Story = StoryObj<typeof App>;
 
-const defaultClient = new ApolloClient({
-  uri: clientUri,
-  cache: new InMemoryCache(),
-  defaultOptions: {
-    watchQuery: {
-      fetchPolicy: "no-cache",
-      errorPolicy: "all",
-    },
-    query: {
-      fetchPolicy: "no-cache",
-      errorPolicy: "all",
-    },
-  },
-});
-
 export const DefaultBehavior: Story = {
   args: {
-    queryName,
-    query,
+    operationName,
   },
-  render: (args) => (
-    <ApolloProvider client={defaultClient}>
-      <App {...args} />
-    </ApolloProvider>
-  ),
 };
-
-const mockedClient = new ApolloClient({
-  uri: clientUri,
-  cache: new InMemoryCache(),
-  defaultOptions: {
-    watchQuery: {
-      fetchPolicy: "no-cache",
-      errorPolicy: "all",
-    },
-    query: {
-      fetchPolicy: "no-cache",
-      errorPolicy: "all",
-    },
-  },
-});
 
 const films = [
   {
@@ -86,16 +90,10 @@ export const MockedSuccess: Story = {
   args: {
     ...DefaultBehavior.args,
   },
-  render: (args) => (
-    <ApolloProvider client={mockedClient}>
-      <App {...args} />
-    </ApolloProvider>
-  ),
   parameters: {
     msw: {
-      clientUri,
       handlers: [
-        graphql.query(queryName, (req, res, ctx) => {
+        graphql.query(operationName, (req, res, ctx) => {
           return res(
             ctx.data({
               allFilms: {
@@ -113,16 +111,10 @@ export const MockedError: Story = {
   args: {
     ...DefaultBehavior.args,
   },
-  render: (args) => (
-    <ApolloProvider client={mockedClient}>
-      <App {...args} />
-    </ApolloProvider>
-  ),
   parameters: {
     msw: {
-      clientUri,
       handlers: [
-        graphql.query(queryName, (req, res, ctx) => {
+        graphql.query(operationName, (req, res, ctx) => {
           return res(
             ctx.delay(800),
             ctx.errors([
